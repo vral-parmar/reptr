@@ -7,6 +7,11 @@ Versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Severity threshold enforcement — `[severity_thresholds]` in `reptr.toml` now
+  gates `reptr build`. Each field (`critical`, `high`, `medium`, `low`) sets the
+  maximum number of **open** findings allowed at that severity level before the build
+  fails. `0` means "fail if any are open". Resolved, accepted, and false-positive
+  findings are not counted. Omitting a field (the default) means no limit.
 - `reptr retest` — diff the current findings against the previous build and emit a
   delta report. On the first run it establishes a baseline (same as `reptr build`).
   On every subsequent run it prints a summary (`N new · N resolved · N regressed …`)

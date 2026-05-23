@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 use super::engagement::Engagement;
+use super::finding::{Severity, Status};
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
@@ -35,6 +36,15 @@ pub enum ValidationError {
     },
     #[error("engagement slug is empty")]
     EmptySlug,
+    #[error(
+        "{count} open {severity} finding(s) exceed the allowed limit of {limit} \
+         — resolve them or raise [severity_thresholds].{severity} in reptr.toml"
+    )]
+    ThresholdExceeded {
+        severity: String,
+        count: usize,
+        limit: u32,
+    },
 }
 
 /// Run the validation rules from §7 of the build plan:
@@ -104,6 +114,36 @@ pub fn validate_engagement(eng: &Engagement) -> Vec<ValidationError> {
         }
     }
 
+    // Severity threshold gating — counts only Status::Open findings.
+    let t = &eng.severity_thresholds;
+    let check_threshold = |limit: Option<u32>, sev: Severity, label: &str| {
+        if let Some(limit) = limit {
+            let count = eng
+                .findings
+                .iter()
+                .filter(|f| f.severity == sev && f.status == Status::Open)
+                .count();
+            if count as u32 > limit {
+                Some(ValidationError::ThresholdExceeded {
+                    severity: label.to_string(),
+                    count,
+                    limit,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    errors.extend([
+        check_threshold(t.critical, Severity::Critical, "critical"),
+        check_threshold(t.high, Severity::High, "high"),
+        check_threshold(t.medium, Severity::Medium, "medium"),
+        check_threshold(t.low, Severity::Low, "low"),
+    ].into_iter().flatten());
+
     errors
 }
 
@@ -113,7 +153,7 @@ mod tests {
 
     use super::*;
     use crate::model::{
-        Client, Engagement, EngagementMeta, Finding, ImageRef, LibraryConfig, OutputConfig,
+        Client, Engagement, EngagementMeta, Finding, LibraryConfig, OutputConfig,
         Severity, SeverityThresholds, Status, TemplateConfig,
     };
 
@@ -299,5 +339,206 @@ mod tests {
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
         assert!(matches!(errors[0], ValidationError::InvalidCvssVector { .. }));
+    }
+
+    // --- severity threshold tests -----------------------------------------
+
+    fn make_finding_with_severity_status(
+        id: &str,
+        severity: Severity,
+        status: Status,
+    ) -> Finding {
+        Finding {
+            id: id.to_string(),
+            title: format!("Finding {id}"),
+            severity,
+            cvss: None,
+            cvss_vector: None,
+            cwe: None,
+            owasp: None,
+            status,
+            affected_assets: vec![],
+            tags: vec![],
+            body_markdown: String::new(),
+            body_html: String::new(),
+            source_path: PathBuf::from(format!("findings/{id}.md")),
+            images: vec![],
+        }
+    }
+
+    fn with_thresholds(mut eng: Engagement, t: SeverityThresholds) -> Engagement {
+        eng.severity_thresholds = t;
+        eng
+    }
+
+    #[test]
+    fn no_thresholds_set_always_passes() {
+        let eng = make_engagement(vec![
+            make_finding_with_severity_status("F-001", Severity::Critical, Status::Open),
+            make_finding_with_severity_status("F-002", Severity::High, Status::Open),
+        ]);
+        // Default thresholds = all None → no gate
+        assert!(validate_engagement(&eng).is_empty());
+    }
+
+    #[test]
+    fn threshold_zero_fails_when_any_open_of_that_severity() {
+        let eng = with_thresholds(
+            make_engagement(vec![make_finding_with_severity_status(
+                "F-001",
+                Severity::Critical,
+                Status::Open,
+            )]),
+            SeverityThresholds { critical: Some(0), ..Default::default() },
+        );
+        let errors = validate_engagement(&eng);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(errors[0], ValidationError::ThresholdExceeded { .. }));
+    }
+
+    #[test]
+    fn threshold_passes_when_count_within_limit() {
+        let eng = with_thresholds(
+            make_engagement(vec![
+                make_finding_with_severity_status("F-001", Severity::High, Status::Open),
+                make_finding_with_severity_status("F-002", Severity::High, Status::Open),
+            ]),
+            SeverityThresholds { high: Some(2), ..Default::default() },
+        );
+        assert!(validate_engagement(&eng).is_empty(), "2 open highs with limit 2 should pass");
+    }
+
+    #[test]
+    fn threshold_fails_when_count_exceeds_limit() {
+        let eng = with_thresholds(
+            make_engagement(vec![
+                make_finding_with_severity_status("F-001", Severity::High, Status::Open),
+                make_finding_with_severity_status("F-002", Severity::High, Status::Open),
+                make_finding_with_severity_status("F-003", Severity::High, Status::Open),
+            ]),
+            SeverityThresholds { high: Some(2), ..Default::default() },
+        );
+        let errors = validate_engagement(&eng);
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(errors[0], ValidationError::ThresholdExceeded { .. }));
+    }
+
+    #[test]
+    fn resolved_findings_do_not_count_against_threshold() {
+        let eng = with_thresholds(
+            make_engagement(vec![
+                make_finding_with_severity_status("F-001", Severity::Critical, Status::Resolved),
+                make_finding_with_severity_status("F-002", Severity::Critical, Status::Resolved),
+            ]),
+            SeverityThresholds { critical: Some(0), ..Default::default() },
+        );
+        assert!(
+            validate_engagement(&eng).is_empty(),
+            "resolved findings should not count against threshold"
+        );
+    }
+
+    #[test]
+    fn accepted_findings_do_not_count_against_threshold() {
+        let eng = with_thresholds(
+            make_engagement(vec![make_finding_with_severity_status(
+                "F-001",
+                Severity::Critical,
+                Status::Accepted,
+            )]),
+            SeverityThresholds { critical: Some(0), ..Default::default() },
+        );
+        assert!(
+            validate_engagement(&eng).is_empty(),
+            "accepted findings should not count against threshold"
+        );
+    }
+
+    #[test]
+    fn false_positive_findings_do_not_count_against_threshold() {
+        let eng = with_thresholds(
+            make_engagement(vec![make_finding_with_severity_status(
+                "F-001",
+                Severity::Critical,
+                Status::FalsePositive,
+            )]),
+            SeverityThresholds { critical: Some(0), ..Default::default() },
+        );
+        assert!(
+            validate_engagement(&eng).is_empty(),
+            "false_positive findings should not count against threshold"
+        );
+    }
+
+    #[test]
+    fn threshold_error_message_includes_count_and_limit() {
+        let eng = with_thresholds(
+            make_engagement(vec![
+                make_finding_with_severity_status("F-001", Severity::Critical, Status::Open),
+                make_finding_with_severity_status("F-002", Severity::Critical, Status::Open),
+            ]),
+            SeverityThresholds { critical: Some(1), ..Default::default() },
+        );
+        let errors = validate_engagement(&eng);
+        assert_eq!(errors.len(), 1);
+        let msg = errors[0].to_string();
+        assert!(msg.contains('2'), "error should mention the count (2). got: {msg}");
+        assert!(msg.contains('1'), "error should mention the limit (1). got: {msg}");
+        assert!(msg.contains("critical"), "error should name the severity. got: {msg}");
+    }
+
+    #[test]
+    fn multiple_severity_thresholds_exceeded_all_reported() {
+        let eng = with_thresholds(
+            make_engagement(vec![
+                make_finding_with_severity_status("F-001", Severity::Critical, Status::Open),
+                make_finding_with_severity_status("F-002", Severity::High, Status::Open),
+            ]),
+            SeverityThresholds {
+                critical: Some(0),
+                high: Some(0),
+                ..Default::default()
+            },
+        );
+        let errors = validate_engagement(&eng);
+        assert_eq!(errors.len(), 2, "both thresholds should be reported");
+        assert!(errors.iter().all(|e| matches!(e, ValidationError::ThresholdExceeded { .. })));
+    }
+
+    #[test]
+    fn threshold_only_applies_to_matching_severity() {
+        // Critical threshold = 0 but the open finding is High — should pass.
+        let eng = with_thresholds(
+            make_engagement(vec![make_finding_with_severity_status(
+                "F-001",
+                Severity::High,
+                Status::Open,
+            )]),
+            SeverityThresholds { critical: Some(0), ..Default::default() },
+        );
+        assert!(
+            validate_engagement(&eng).is_empty(),
+            "critical threshold should not affect high findings"
+        );
+    }
+
+    #[test]
+    fn threshold_none_means_unlimited() {
+        // 10 open criticals with None threshold → no error.
+        let findings: Vec<Finding> = (1..=10)
+            .map(|i| {
+                make_finding_with_severity_status(
+                    &format!("F-{i:03}"),
+                    Severity::Critical,
+                    Status::Open,
+                )
+            })
+            .collect();
+        let eng = make_engagement(findings);
+        // threshold.critical is None by default
+        assert!(
+            validate_engagement(&eng).is_empty(),
+            "None threshold should never fire regardless of count"
+        );
     }
 }

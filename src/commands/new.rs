@@ -19,11 +19,10 @@ file = "client.toml"
 formats = ["html", "json"]
 directory = "output"
 
-[severity_thresholds]
-critical = 9.0
-high     = 7.0
-medium   = 4.0
-low      = 0.1
+# Uncomment to enforce open-finding limits during build (useful in CI):
+# [severity_thresholds]
+# critical = 0   # fail if any critical finding is open
+# high     = 5   # fail if more than 5 high findings are open
 "#;
 
 const CLIENT_TOML_TEMPLATE: &str = r#"name = "Acme Corp"

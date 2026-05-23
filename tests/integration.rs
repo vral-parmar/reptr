@@ -1268,6 +1268,267 @@ fn cvss_fixture_findings_have_matching_score_and_vector() {
     assert_eq!(f001.cvss_vector.as_deref(), Some(CVSS_VECTOR_9_8));
 }
 
+// --- Severity threshold integration tests --------------------------------
+
+/// Write `[severity_thresholds]` into the engagement's reptr.toml.
+fn set_thresholds(dst: &std::path::Path, toml_snippet: &str) {
+    let cfg_path = dst.join("reptr.toml");
+    let mut cfg = fs::read_to_string(&cfg_path).unwrap();
+    cfg.push_str(&format!("\n[severity_thresholds]\n{toml_snippet}\n"));
+    fs::write(&cfg_path, cfg).unwrap();
+}
+
+#[test]
+fn threshold_not_set_build_always_passes() {
+    // Fixture has an open Critical (F-001) — without a threshold it should pass.
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    build::run(dst).expect("build without thresholds should succeed regardless of open findings");
+}
+
+#[test]
+fn threshold_zero_critical_fails_when_critical_open() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    set_thresholds(dst, "critical = 0");
+
+    let err = build::run(dst).expect_err("open critical finding should fail threshold");
+    let msg = format!("{err:#}");
+    assert!(
+        msg.to_lowercase().contains("validation"),
+        "error should mention validation. got: {msg}"
+    );
+}
+
+#[test]
+fn threshold_zero_critical_passes_when_no_open_criticals() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    set_thresholds(dst, "critical = 0");
+
+    // Resolve the critical finding so nothing is open at that level.
+    set_finding_status(
+        &dst.join("findings/001-sql-injection-in-login-form.md"),
+        "resolved",
+    );
+
+    build::run(dst).expect("no open criticals → threshold of 0 should pass");
+}
+
+#[test]
+fn threshold_passes_when_count_exactly_at_limit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    // Fixture has 1 open critical. Setting limit = 1 should pass (1 ≤ 1 is ok? no — limit means
+    // "more than N fails", so limit = 1 means allow up to 1).
+    // Actually the logic is: count > limit → fail. So count=1, limit=1 → 1 > 1 is false → passes.
+    set_thresholds(dst, "critical = 1");
+
+    build::run(dst).expect("1 open critical with limit 1 should pass");
+}
+
+#[test]
+fn threshold_fails_when_count_exceeds_limit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    // Add a second critical finding.
+    fs::write(
+        dst.join("findings/003-extra-critical.md"),
+        "---\nid: F-003\ntitle: Extra Critical\nseverity: critical\nstatus: open\n---\n\nbody.\n",
+    )
+    .unwrap();
+    set_thresholds(dst, "critical = 1");
+
+    let err = build::run(dst).expect_err("2 open criticals with limit 1 should fail");
+    let msg = format!("{err:#}");
+    assert!(
+        msg.to_lowercase().contains("validation"),
+        "error should mention validation. got: {msg}"
+    );
+}
+
+#[test]
+fn threshold_resolved_findings_do_not_trigger_gate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    set_thresholds(dst, "critical = 0");
+
+    // Resolve F-001 so there are 0 open criticals.
+    set_finding_status(
+        &dst.join("findings/001-sql-injection-in-login-form.md"),
+        "resolved",
+    );
+
+    build::run(dst).expect("resolved critical should not count against threshold");
+}
+
+#[test]
+fn threshold_accepted_findings_do_not_trigger_gate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    set_thresholds(dst, "critical = 0");
+
+    // Mark F-001 as accepted (risk acknowledged).
+    set_finding_status(
+        &dst.join("findings/001-sql-injection-in-login-form.md"),
+        "accepted",
+    );
+
+    build::run(dst).expect("accepted critical should not count against threshold");
+}
+
+#[test]
+fn threshold_only_applies_to_matching_severity() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    // Gate on high findings — fixture has none open at High, only Critical and Low.
+    set_thresholds(dst, "high = 0");
+
+    build::run(dst).expect("no open high findings → high threshold of 0 should pass");
+}
+
+#[test]
+fn threshold_error_message_is_actionable() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    set_thresholds(dst, "critical = 0");
+
+    let err = build::run(dst).expect_err("expected validation failure");
+    // The individual error messages are printed to stderr; the bail message
+    // reports a count — just confirm it's a validation failure.
+    let msg = format!("{err:#}");
+    assert!(
+        msg.to_lowercase().contains("validation"),
+        "expected validation message. got: {msg}"
+    );
+}
+
+#[test]
+fn multiple_thresholds_exceeded_fails_build() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dst = tmp.path();
+    copy_dir(&fixture_root(), dst).unwrap();
+    // Fixture: 1 open critical + 1 open low. Gate both.
+    set_thresholds(dst, "critical = 0\nlow = 0");
+
+    let err = build::run(dst).expect_err("both thresholds exceeded should fail build");
+    let msg = format!("{err:#}");
+    // bail message: "2 validation error(s)" (or more if other errors)
+    assert!(
+        msg.contains('2') || msg.to_lowercase().contains("validation"),
+        "expected 2 threshold errors. got: {msg}"
+    );
+}
+
+// --- watch integration tests ---------------------------------------------
+
+#[test]
+fn watch_startup_build_creates_output_files() {
+    use reptr::commands::watch;
+    use std::time::{Duration, Instant};
+
+    let (_tmp, dst) = setup_engagement();
+    let dst_clone = dst.clone();
+
+    std::thread::spawn(move || {
+        let _ = watch::run(&dst_clone);
+    });
+
+    // Poll up to 5 s for the startup build to produce output.
+    let html = dst.join(format!("output/{SLUG}.html"));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        if html.exists() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    panic!("watch startup build did not produce HTML within 5 seconds");
+}
+
+#[test]
+fn watch_startup_produces_json_with_correct_slug() {
+    use reptr::commands::watch;
+    use std::time::{Duration, Instant};
+
+    let (_tmp, dst) = setup_engagement();
+    let dst_clone = dst.clone();
+
+    std::thread::spawn(move || {
+        let _ = watch::run(&dst_clone);
+    });
+
+    let json_path = dst.join(format!("output/{SLUG}.json"));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        if json_path.exists() {
+            let body = fs::read_to_string(&json_path).unwrap();
+            let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+            assert_eq!(parsed["meta"]["slug"], SLUG);
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    panic!("watch startup build did not produce JSON within 5 seconds");
+}
+
+#[test]
+fn watch_rebuilds_after_finding_added() {
+    use reptr::commands::watch;
+    use std::time::{Duration, Instant};
+
+    let (_tmp, dst) = setup_engagement();
+    let dst_clone = dst.clone();
+
+    std::thread::spawn(move || {
+        let _ = watch::run(&dst_clone);
+    });
+
+    // Wait for startup build.
+    let json_path = dst.join(format!("output/{SLUG}.json"));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline && !json_path.exists() {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(json_path.exists(), "startup build must complete first");
+
+    let mtime_before = fs::metadata(&json_path).unwrap().modified().unwrap();
+
+    // Add a new finding to trigger a rebuild.
+    fs::write(
+        dst.join("findings/003-watch-test.md"),
+        "---\nid: F-003\ntitle: Watch Trigger Finding\nseverity: medium\nstatus: open\n---\n\nbody.\n",
+    )
+    .unwrap();
+
+    // Wait up to 4 s for the rebuild (250 ms debounce + build time).
+    let deadline = Instant::now() + Duration::from_secs(4);
+    loop {
+        std::thread::sleep(Duration::from_millis(150));
+        if let Ok(meta) = fs::metadata(&json_path) {
+            if meta.modified().unwrap() > mtime_before {
+                let body = fs::read_to_string(&json_path).unwrap();
+                let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+                let count = parsed["findings"].as_array().unwrap().len();
+                assert_eq!(count, 3, "rebuilt JSON should contain all 3 findings");
+                return;
+            }
+        }
+        if Instant::now() >= deadline {
+            panic!("watch did not rebuild within 4 s after adding a new finding");
+        }
+    }
+}
+
 // --- helpers -------------------------------------------------------------
 
 fn copy_dir(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {

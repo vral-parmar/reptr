@@ -92,40 +92,29 @@ pub struct LibraryConfig {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/// Per-severity limits on the number of **open** findings allowed before
+/// `reptr build` fails. `None` (the default for every field) means no limit.
+/// Set to `0` to fail if any open finding of that severity exists (CI gate).
+///
+/// ```toml
+/// [severity_thresholds]
+/// critical = 0   # fail if any critical is open
+/// high     = 3   # fail if more than 3 highs are open
+/// ```
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SeverityThresholds {
-    #[serde(default = "default_critical")]
-    pub critical: f32,
-    #[serde(default = "default_high")]
-    pub high: f32,
-    #[serde(default = "default_medium")]
-    pub medium: f32,
-    #[serde(default = "default_low")]
-    pub low: f32,
-}
-
-impl Default for SeverityThresholds {
-    fn default() -> Self {
-        Self {
-            critical: default_critical(),
-            high: default_high(),
-            medium: default_medium(),
-            low: default_low(),
-        }
-    }
-}
-
-fn default_critical() -> f32 {
-    9.0
-}
-fn default_high() -> f32 {
-    7.0
-}
-fn default_medium() -> f32 {
-    4.0
-}
-fn default_low() -> f32 {
-    0.1
+    /// Max open critical findings allowed. `None` = unlimited.
+    #[serde(default)]
+    pub critical: Option<u32>,
+    /// Max open high findings allowed. `None` = unlimited.
+    #[serde(default)]
+    pub high: Option<u32>,
+    /// Max open medium findings allowed. `None` = unlimited.
+    #[serde(default)]
+    pub medium: Option<u32>,
+    /// Max open low findings allowed. `None` = unlimited.
+    #[serde(default)]
+    pub low: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

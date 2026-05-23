@@ -4,7 +4,7 @@
 > Write findings as Markdown. Run `reptr build`. Get HTML, JSON, DOCX, and PDF.  
 > No Docker, no database, no SaaS.
 
-[![CI](https://github.com/yourhandle/reptr/actions/workflows/ci.yml/badge.svg)](https://github.com/yourhandle/reptr/actions/workflows/ci.yml)
+[![CI](https://github.com/vral-parmar/reptr/actions/workflows/ci.yml/badge.svg)](https://github.com/vral-parmar/reptr/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/reptr.svg)](https://crates.io/crates/reptr)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
@@ -42,7 +42,7 @@ cargo install reptr
 ### From source
 
 ```bash
-git clone https://github.com/yourhandle/reptr
+git clone https://github.com/vral-parmar/reptr
 cd reptr
 cargo install --path .
 ```
@@ -328,7 +328,7 @@ critical = 1
 Open an issue first for anything that changes the data model, adds a new output format, or touches the CLI surface. Smaller fixes — typos, edge-case tests, doc clarifications — are welcome as a direct PR.
 
 ```bash
-git clone https://github.com/yourhandle/reptr
+git clone https://github.com/vral-parmar/reptr
 cd reptr
 cargo test
 ```

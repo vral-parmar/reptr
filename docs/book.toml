@@ -1,0 +1,18 @@
+[book]
+title       = "reptr"
+description = "Local-first pentest report generator"
+authors     = ["vral-parmar"]
+language    = "en"
+src         = "src"
+
+[output.html]
+site-url              = "/reptr/"
+git-repository-url    = "https://github.com/vral-parmar/reptr"
+git-repository-icon   = "fa-github"
+edit-url-template     = "https://github.com/vral-parmar/reptr/edit/main/docs/src/{path}"
+no-section-label      = true
+additional-css        = ["custom.css"]
+
+[output.html.fold]
+enable    = true
+level     = 1

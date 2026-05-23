@@ -13,8 +13,7 @@ file = "client.toml"
 formats = ["html", "json"]
 directory = "output"
 
-[severity_thresholds]
-critical = 9.0
-high     = 7.0
-medium   = 4.0
-low      = 0.1
+# Uncomment to enforce open-finding limits (useful in CI):
+# [severity_thresholds]
+# critical = 0   # fail if any critical finding is open
+# high     = 5

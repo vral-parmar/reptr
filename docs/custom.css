@@ -1,0 +1,18 @@
+/* Tighten code block padding and give tables a cleaner look */
+.content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+.content table th,
+.content table td {
+    border: 1px solid var(--table-border-color);
+    padding: 6px 12px;
+}
+.content table th {
+    background: var(--table-header-bg);
+}
+/* Subtle call-out for shell examples */
+.content pre code {
+    font-size: 0.88em;
+}

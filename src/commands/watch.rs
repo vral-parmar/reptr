@@ -94,3 +94,100 @@ fn pretty_trigger(paths: &[PathBuf], root: &Path) -> String {
         format!("{} files", names.len())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::event::{AccessKind, CreateKind, ModifyKind, RemoveKind};
+
+    // --- is_relevant ---------------------------------------------------------
+
+    #[test]
+    fn is_relevant_accepts_create() {
+        assert!(is_relevant(&EventKind::Create(CreateKind::File)));
+    }
+
+    #[test]
+    fn is_relevant_accepts_modify() {
+        assert!(is_relevant(&EventKind::Modify(ModifyKind::Any)));
+    }
+
+    #[test]
+    fn is_relevant_accepts_remove() {
+        assert!(is_relevant(&EventKind::Remove(RemoveKind::File)));
+    }
+
+    #[test]
+    fn is_relevant_rejects_access_events() {
+        assert!(!is_relevant(&EventKind::Access(AccessKind::Any)));
+    }
+
+    #[test]
+    fn is_relevant_rejects_other() {
+        assert!(!is_relevant(&EventKind::Other));
+    }
+
+    // --- pretty_trigger ------------------------------------------------------
+
+    #[test]
+    fn pretty_trigger_single_file_shows_relative_path() {
+        let root = PathBuf::from("/eng");
+        let paths = vec![PathBuf::from("/eng/findings/001.md")];
+        assert_eq!(pretty_trigger(&paths, &root), "findings/001.md");
+    }
+
+    #[test]
+    fn pretty_trigger_two_files_joined_with_comma() {
+        let root = PathBuf::from("/eng");
+        let paths = vec![
+            PathBuf::from("/eng/findings/001.md"),
+            PathBuf::from("/eng/findings/002.md"),
+        ];
+        let result = pretty_trigger(&paths, &root);
+        assert!(result.contains("findings/001.md"), "got: {result}");
+        assert!(result.contains("findings/002.md"), "got: {result}");
+        assert!(result.contains(','), "two paths should be comma-separated. got: {result}");
+    }
+
+    #[test]
+    fn pretty_trigger_three_files_shows_count() {
+        let root = PathBuf::from("/eng");
+        let paths = vec![
+            PathBuf::from("/eng/findings/001.md"),
+            PathBuf::from("/eng/findings/002.md"),
+            PathBuf::from("/eng/findings/003.md"),
+        ];
+        let result = pretty_trigger(&paths, &root);
+        assert_eq!(result, "3 files", "got: {result}");
+    }
+
+    #[test]
+    fn pretty_trigger_deduplicates_repeated_paths() {
+        let root = PathBuf::from("/eng");
+        // Same path sent twice (common when an editor does a save + chmod).
+        let paths = vec![
+            PathBuf::from("/eng/findings/001.md"),
+            PathBuf::from("/eng/findings/001.md"),
+        ];
+        let result = pretty_trigger(&paths, &root);
+        // After dedup it's a single path — should NOT say "2 files".
+        assert!(!result.contains("files"), "duplicate paths should be deduped. got: {result}");
+        assert!(result.contains("findings/001.md"), "got: {result}");
+    }
+
+    #[test]
+    fn pretty_trigger_strips_root_prefix() {
+        let root = PathBuf::from("/long/path/to/engagement");
+        let paths = vec![PathBuf::from("/long/path/to/engagement/reptr.toml")];
+        assert_eq!(pretty_trigger(&paths, &root), "reptr.toml");
+    }
+
+    #[test]
+    fn pretty_trigger_out_of_root_path_excluded() {
+        // A path that can't have the root stripped is silently dropped.
+        let root = PathBuf::from("/eng");
+        let paths = vec![PathBuf::from("/other/dir/file.md")];
+        // strip_prefix fails → filter_map drops it → result is empty string
+        assert_eq!(pretty_trigger(&paths, &root), "");
+    }
+}
