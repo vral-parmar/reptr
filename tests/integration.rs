@@ -568,16 +568,15 @@ fn set_finding_severity(path: &std::path::Path, new_severity: &str) {
 /// Helper: read `output/<slug>-retest.json` and return it as a Value.
 fn read_retest_json(dst: &std::path::Path, slug: &str) -> serde_json::Value {
     let path = dst.join(format!("output/{slug}-retest.json"));
-    let data = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+    let data =
+        fs::read_to_string(&path).unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
     serde_json::from_str(&data).unwrap()
 }
 
 /// Helper: read `output/<slug>-retest.html` as a string.
 fn read_retest_html(dst: &std::path::Path, slug: &str) -> String {
     let path = dst.join(format!("output/{slug}-retest.html"));
-    fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()))
+    fs::read_to_string(&path).unwrap_or_else(|e| panic!("reading {}: {e}", path.display()))
 }
 
 const SLUG: &str = "acme-webapp-2026";
@@ -626,7 +625,10 @@ fn retest_no_changes_all_unchanged() {
     retest::run(&dst).expect("second retest ok");
 
     let json = read_retest_json(&dst, SLUG);
-    assert_eq!(json["unchanged_count"], 2, "both fixture findings should be unchanged");
+    assert_eq!(
+        json["unchanged_count"], 2,
+        "both fixture findings should be unchanged"
+    );
     assert_eq!(json["new_count"], 0);
     assert_eq!(json["resolved_count"], 0);
     assert_eq!(json["regressed_count"], 0);
@@ -783,11 +785,17 @@ fn retest_accepted_status_to_resolved_counts_as_resolved() {
     let (_tmp, dst) = setup_engagement();
 
     // Mark F-002 as accepted in the baseline.
-    set_finding_status(&dst.join("findings/002-missing-security-headers.md"), "accepted");
+    set_finding_status(
+        &dst.join("findings/002-missing-security-headers.md"),
+        "accepted",
+    );
     retest::run(&dst).expect("baseline ok");
 
     // Then resolve it.
-    set_finding_status(&dst.join("findings/002-missing-security-headers.md"), "resolved");
+    set_finding_status(
+        &dst.join("findings/002-missing-security-headers.md"),
+        "resolved",
+    );
     retest::run(&dst).expect("diff run ok");
 
     let json = read_retest_json(&dst, SLUG);
@@ -849,12 +857,21 @@ fn retest_html_resolved_finding_gets_correct_classes() {
     let (_tmp, dst) = setup_engagement();
     retest::run(&dst).expect("baseline ok");
 
-    set_finding_status(&dst.join("findings/001-sql-injection-in-login-form.md"), "resolved");
+    set_finding_status(
+        &dst.join("findings/001-sql-injection-in-login-form.md"),
+        "resolved",
+    );
     retest::run(&dst).expect("diff run ok");
 
     let html = read_retest_html(&dst, SLUG);
-    assert!(html.contains("tag-resolved"), "resolved badge class missing");
-    assert!(html.contains("sev-critical"), "critical severity badge missing");
+    assert!(
+        html.contains("tag-resolved"),
+        "resolved badge class missing"
+    );
+    assert!(
+        html.contains("sev-critical"),
+        "critical severity badge missing"
+    );
 }
 
 #[test]
@@ -862,15 +879,24 @@ fn retest_html_regressed_finding_gets_regressed_class() {
     let (_tmp, dst) = setup_engagement();
 
     // Baseline with F-001 resolved.
-    set_finding_status(&dst.join("findings/001-sql-injection-in-login-form.md"), "resolved");
+    set_finding_status(
+        &dst.join("findings/001-sql-injection-in-login-form.md"),
+        "resolved",
+    );
     retest::run(&dst).expect("baseline ok");
 
     // Regress it.
-    set_finding_status(&dst.join("findings/001-sql-injection-in-login-form.md"), "open");
+    set_finding_status(
+        &dst.join("findings/001-sql-injection-in-login-form.md"),
+        "open",
+    );
     retest::run(&dst).expect("diff run ok");
 
     let html = read_retest_html(&dst, SLUG);
-    assert!(html.contains("tag-regressed"), "regressed badge class missing");
+    assert!(
+        html.contains("tag-regressed"),
+        "regressed badge class missing"
+    );
 }
 
 #[test]
@@ -887,7 +913,10 @@ fn retest_html_new_finding_gets_tag_new_class() {
 
     let html = read_retest_html(&dst, SLUG);
     assert!(html.contains("tag-new"), "new badge class missing");
-    assert!(html.contains("New XSS"), "new finding title missing from HTML");
+    assert!(
+        html.contains("New XSS"),
+        "new finding title missing from HTML"
+    );
 }
 
 #[test]
@@ -899,7 +928,11 @@ fn retest_json_delta_array_contains_all_findings() {
     let json = read_retest_json(&dst, SLUG);
     let deltas = json["deltas"].as_array().unwrap();
     // Fixture has 2 findings; both should appear in the delta array.
-    assert_eq!(deltas.len(), 2, "delta array should contain all 2 fixture findings");
+    assert_eq!(
+        deltas.len(),
+        2,
+        "delta array should contain all 2 fixture findings"
+    );
 }
 
 #[test]
@@ -914,7 +947,10 @@ fn retest_json_delta_has_required_fields() {
         assert!(d["id"].is_string(), "delta missing `id` field");
         assert!(d["title"].is_string(), "delta missing `title` field");
         assert!(d["severity"].is_string(), "delta missing `severity` field");
-        assert!(d["change_type"].is_string(), "delta missing `change_type` field");
+        assert!(
+            d["change_type"].is_string(),
+            "delta missing `change_type` field"
+        );
         assert!(d["label"].is_string(), "delta missing `label` field");
     }
 }
@@ -1017,7 +1053,13 @@ fn write_cvss_finding(
     fm.push_str("---\n\n## Description\n\nbody.\n");
     let slug: String = title
         .chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect();
     fs::write(dst.join(format!("findings/003-{slug}.md")), fm).unwrap();
 }
@@ -1061,7 +1103,10 @@ fn cvss_derived_score_is_formatted_to_one_decimal_place() {
 
     let f003 = get_finding_from_json(&dst, "F-003");
     let score = f003["cvss"].as_str().unwrap();
-    assert_eq!(score, "7.5", "derived score must be exactly '7.5', not '7.50' or '7'");
+    assert_eq!(
+        score, "7.5",
+        "derived score must be exactly '7.5', not '7.50' or '7'"
+    );
 }
 
 #[test]
@@ -1130,7 +1175,13 @@ fn cvss_score_ten_is_valid() {
 #[test]
 fn cvss_matching_score_and_vector_passes_build() {
     let (_tmp, dst) = setup_engagement();
-    write_cvss_finding(&dst, "F-003", "SSRF High", Some("7.5"), Some(CVSS_VECTOR_7_5));
+    write_cvss_finding(
+        &dst,
+        "F-003",
+        "SSRF High",
+        Some("7.5"),
+        Some(CVSS_VECTOR_7_5),
+    );
 
     build::run(&dst).expect("matching explicit score and vector should pass validation");
 }
@@ -1138,7 +1189,13 @@ fn cvss_matching_score_and_vector_passes_build() {
 #[test]
 fn cvss_invalid_vector_fails_build() {
     let (_tmp, dst) = setup_engagement();
-    write_cvss_finding(&dst, "F-003", "Bad Vector", None, Some("CVSS:3.1/INVALID/VECTOR"));
+    write_cvss_finding(
+        &dst,
+        "F-003",
+        "Bad Vector",
+        None,
+        Some("CVSS:3.1/INVALID/VECTOR"),
+    );
 
     let err = build::run(&dst).expect_err("invalid CVSS vector should cause build failure");
     let msg = format!("{err:#}");
@@ -1151,7 +1208,13 @@ fn cvss_invalid_vector_fails_build() {
 #[test]
 fn cvss_completely_malformed_vector_fails_build() {
     let (_tmp, dst) = setup_engagement();
-    write_cvss_finding(&dst, "F-003", "Malformed Vector", None, Some("not-a-cvss-vector"));
+    write_cvss_finding(
+        &dst,
+        "F-003",
+        "Malformed Vector",
+        None,
+        Some("not-a-cvss-vector"),
+    );
 
     let err = build::run(&dst).expect_err("completely malformed vector should fail");
     let msg = format!("{err:#}");
@@ -1165,7 +1228,13 @@ fn cvss_completely_malformed_vector_fails_build() {
 fn cvss_score_mismatch_fails_build() {
     let (_tmp, dst) = setup_engagement();
     // Score says 5.0 but the vector computes 9.8.
-    write_cvss_finding(&dst, "F-003", "Mismatch Finding", Some("5.0"), Some(CVSS_VECTOR_9_8));
+    write_cvss_finding(
+        &dst,
+        "F-003",
+        "Mismatch Finding",
+        Some("5.0"),
+        Some(CVSS_VECTOR_9_8),
+    );
 
     let err = build::run(&dst).expect_err("mismatched score/vector should fail validation");
     let msg = format!("{err:#}");
@@ -1204,7 +1273,13 @@ fn cvss_negative_score_fails_build() {
 #[test]
 fn cvss_non_numeric_score_fails_build() {
     let (_tmp, dst) = setup_engagement();
-    write_cvss_finding(&dst, "F-003", "Non Numeric Score", Some("not-a-number"), None);
+    write_cvss_finding(
+        &dst,
+        "F-003",
+        "Non Numeric Score",
+        Some("not-a-number"),
+        None,
+    );
 
     let err = build::run(&dst).expect_err("non-numeric CVSS score should fail validation");
     let msg = format!("{err:#}");
@@ -1243,7 +1318,13 @@ fn cvss_valid_finding_among_invalid_does_not_suppress_error() {
     let (_tmp, dst) = setup_engagement();
     // F-003 is valid (9.8 with matching vector from fixture F-001 is already
     // clean); add F-004 with a bad vector. Build must still fail.
-    write_cvss_finding(&dst, "F-003", "Valid Finding", Some("9.8"), Some(CVSS_VECTOR_9_8));
+    write_cvss_finding(
+        &dst,
+        "F-003",
+        "Valid Finding",
+        Some("9.8"),
+        Some(CVSS_VECTOR_9_8),
+    );
     fs::write(
         dst.join("findings/004-bad.md"),
         "---\nid: F-004\ntitle: Bad Vector\nseverity: medium\nstatus: open\ncvss_vector: \"CVSS:3.1/GARBAGE\"\n---\n\nbody.\n",
@@ -1263,7 +1344,11 @@ fn cvss_fixture_findings_have_matching_score_and_vector() {
     // Regression guard: verifies that F-001 in the fixture continues to have a
     // matching cvss score and vector so other tests using the fixture stay clean.
     let eng = build_engagement(&fixture_root());
-    let f001 = eng.findings.iter().find(|f| f.id == "F-001").expect("F-001 in fixture");
+    let f001 = eng
+        .findings
+        .iter()
+        .find(|f| f.id == "F-001")
+        .expect("F-001 in fixture");
     assert_eq!(f001.cvss.as_deref(), Some("9.8"));
     assert_eq!(f001.cvss_vector.as_deref(), Some(CVSS_VECTOR_9_8));
 }

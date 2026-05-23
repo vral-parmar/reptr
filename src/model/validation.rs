@@ -137,12 +137,16 @@ pub fn validate_engagement(eng: &Engagement) -> Vec<ValidationError> {
         }
     };
 
-    errors.extend([
-        check_threshold(t.critical, Severity::Critical, "critical"),
-        check_threshold(t.high, Severity::High, "high"),
-        check_threshold(t.medium, Severity::Medium, "medium"),
-        check_threshold(t.low, Severity::Low, "low"),
-    ].into_iter().flatten());
+    errors.extend(
+        [
+            check_threshold(t.critical, Severity::Critical, "critical"),
+            check_threshold(t.high, Severity::High, "high"),
+            check_threshold(t.medium, Severity::Medium, "medium"),
+            check_threshold(t.low, Severity::Low, "low"),
+        ]
+        .into_iter()
+        .flatten(),
+    );
 
     errors
 }
@@ -153,8 +157,8 @@ mod tests {
 
     use super::*;
     use crate::model::{
-        Client, Engagement, EngagementMeta, Finding, LibraryConfig, OutputConfig,
-        Severity, SeverityThresholds, Status, TemplateConfig,
+        Client, Engagement, EngagementMeta, Finding, LibraryConfig, OutputConfig, Severity,
+        SeverityThresholds, Status, TemplateConfig,
     };
 
     fn make_finding(id: &str, cvss: Option<&str>, cvss_vector: Option<&str>) -> Finding {
@@ -253,10 +257,17 @@ mod tests {
 
     #[test]
     fn invalid_cvss_vector_format_fails() {
-        let eng = make_engagement(vec![make_finding("F-001", None, Some("CVSS:3.1/NOT_A_VECTOR"))]);
+        let eng = make_engagement(vec![make_finding(
+            "F-001",
+            None,
+            Some("CVSS:3.1/NOT_A_VECTOR"),
+        )]);
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(errors[0], ValidationError::InvalidCvssVector { .. }));
+        assert!(matches!(
+            errors[0],
+            ValidationError::InvalidCvssVector { .. }
+        ));
         let msg = errors[0].to_string();
         assert!(msg.contains("CVSS:3.1/NOT_A_VECTOR"));
     }
@@ -266,7 +277,10 @@ mod tests {
         let eng = make_engagement(vec![make_finding("F-001", None, Some("not-a-cvss-vector"))]);
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(errors[0], ValidationError::InvalidCvssVector { .. }));
+        assert!(matches!(
+            errors[0],
+            ValidationError::InvalidCvssVector { .. }
+        ));
     }
 
     #[test]
@@ -275,7 +289,10 @@ mod tests {
         let eng = make_engagement(vec![make_finding("F-001", Some("5.0"), Some(VECTOR_9_8))]);
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(errors[0], ValidationError::CvssScoreMismatch { .. }));
+        assert!(matches!(
+            errors[0],
+            ValidationError::CvssScoreMismatch { .. }
+        ));
         let msg = errors[0].to_string();
         assert!(msg.contains("5.0"));
         assert!(msg.contains("9.8"));
@@ -287,7 +304,10 @@ mod tests {
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
         let msg = errors[0].to_string();
-        assert!(msg.contains(VECTOR_7_5), "error should quote the vector. got: {msg}");
+        assert!(
+            msg.contains(VECTOR_7_5),
+            "error should quote the vector. got: {msg}"
+        );
     }
 
     #[test]
@@ -305,7 +325,10 @@ mod tests {
         let errors = validate_engagement(&eng);
         assert!(!errors.is_empty());
         let msg = errors[0].to_string();
-        assert!(msg.contains("001-sqli.md"), "error should name the file. got: {msg}");
+        assert!(
+            msg.contains("001-sqli.md"),
+            "error should name the file. got: {msg}"
+        );
     }
 
     #[test]
@@ -338,16 +361,15 @@ mod tests {
         ]);
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(errors[0], ValidationError::InvalidCvssVector { .. }));
+        assert!(matches!(
+            errors[0],
+            ValidationError::InvalidCvssVector { .. }
+        ));
     }
 
     // --- severity threshold tests -----------------------------------------
 
-    fn make_finding_with_severity_status(
-        id: &str,
-        severity: Severity,
-        status: Status,
-    ) -> Finding {
+    fn make_finding_with_severity_status(id: &str, severity: Severity, status: Status) -> Finding {
         Finding {
             id: id.to_string(),
             title: format!("Finding {id}"),
@@ -389,11 +411,17 @@ mod tests {
                 Severity::Critical,
                 Status::Open,
             )]),
-            SeverityThresholds { critical: Some(0), ..Default::default() },
+            SeverityThresholds {
+                critical: Some(0),
+                ..Default::default()
+            },
         );
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(errors[0], ValidationError::ThresholdExceeded { .. }));
+        assert!(matches!(
+            errors[0],
+            ValidationError::ThresholdExceeded { .. }
+        ));
     }
 
     #[test]
@@ -403,9 +431,15 @@ mod tests {
                 make_finding_with_severity_status("F-001", Severity::High, Status::Open),
                 make_finding_with_severity_status("F-002", Severity::High, Status::Open),
             ]),
-            SeverityThresholds { high: Some(2), ..Default::default() },
+            SeverityThresholds {
+                high: Some(2),
+                ..Default::default()
+            },
         );
-        assert!(validate_engagement(&eng).is_empty(), "2 open highs with limit 2 should pass");
+        assert!(
+            validate_engagement(&eng).is_empty(),
+            "2 open highs with limit 2 should pass"
+        );
     }
 
     #[test]
@@ -416,11 +450,17 @@ mod tests {
                 make_finding_with_severity_status("F-002", Severity::High, Status::Open),
                 make_finding_with_severity_status("F-003", Severity::High, Status::Open),
             ]),
-            SeverityThresholds { high: Some(2), ..Default::default() },
+            SeverityThresholds {
+                high: Some(2),
+                ..Default::default()
+            },
         );
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
-        assert!(matches!(errors[0], ValidationError::ThresholdExceeded { .. }));
+        assert!(matches!(
+            errors[0],
+            ValidationError::ThresholdExceeded { .. }
+        ));
     }
 
     #[test]
@@ -430,7 +470,10 @@ mod tests {
                 make_finding_with_severity_status("F-001", Severity::Critical, Status::Resolved),
                 make_finding_with_severity_status("F-002", Severity::Critical, Status::Resolved),
             ]),
-            SeverityThresholds { critical: Some(0), ..Default::default() },
+            SeverityThresholds {
+                critical: Some(0),
+                ..Default::default()
+            },
         );
         assert!(
             validate_engagement(&eng).is_empty(),
@@ -446,7 +489,10 @@ mod tests {
                 Severity::Critical,
                 Status::Accepted,
             )]),
-            SeverityThresholds { critical: Some(0), ..Default::default() },
+            SeverityThresholds {
+                critical: Some(0),
+                ..Default::default()
+            },
         );
         assert!(
             validate_engagement(&eng).is_empty(),
@@ -462,7 +508,10 @@ mod tests {
                 Severity::Critical,
                 Status::FalsePositive,
             )]),
-            SeverityThresholds { critical: Some(0), ..Default::default() },
+            SeverityThresholds {
+                critical: Some(0),
+                ..Default::default()
+            },
         );
         assert!(
             validate_engagement(&eng).is_empty(),
@@ -477,14 +526,26 @@ mod tests {
                 make_finding_with_severity_status("F-001", Severity::Critical, Status::Open),
                 make_finding_with_severity_status("F-002", Severity::Critical, Status::Open),
             ]),
-            SeverityThresholds { critical: Some(1), ..Default::default() },
+            SeverityThresholds {
+                critical: Some(1),
+                ..Default::default()
+            },
         );
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 1);
         let msg = errors[0].to_string();
-        assert!(msg.contains('2'), "error should mention the count (2). got: {msg}");
-        assert!(msg.contains('1'), "error should mention the limit (1). got: {msg}");
-        assert!(msg.contains("critical"), "error should name the severity. got: {msg}");
+        assert!(
+            msg.contains('2'),
+            "error should mention the count (2). got: {msg}"
+        );
+        assert!(
+            msg.contains('1'),
+            "error should mention the limit (1). got: {msg}"
+        );
+        assert!(
+            msg.contains("critical"),
+            "error should name the severity. got: {msg}"
+        );
     }
 
     #[test]
@@ -502,7 +563,9 @@ mod tests {
         );
         let errors = validate_engagement(&eng);
         assert_eq!(errors.len(), 2, "both thresholds should be reported");
-        assert!(errors.iter().all(|e| matches!(e, ValidationError::ThresholdExceeded { .. })));
+        assert!(errors
+            .iter()
+            .all(|e| matches!(e, ValidationError::ThresholdExceeded { .. })));
     }
 
     #[test]
@@ -514,7 +577,10 @@ mod tests {
                 Severity::High,
                 Status::Open,
             )]),
-            SeverityThresholds { critical: Some(0), ..Default::default() },
+            SeverityThresholds {
+                critical: Some(0),
+                ..Default::default()
+            },
         );
         assert!(
             validate_engagement(&eng).is_empty(),

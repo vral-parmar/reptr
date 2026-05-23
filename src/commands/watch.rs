@@ -146,7 +146,10 @@ mod tests {
         let result = pretty_trigger(&paths, &root);
         assert!(result.contains("findings/001.md"), "got: {result}");
         assert!(result.contains("findings/002.md"), "got: {result}");
-        assert!(result.contains(','), "two paths should be comma-separated. got: {result}");
+        assert!(
+            result.contains(','),
+            "two paths should be comma-separated. got: {result}"
+        );
     }
 
     #[test]
@@ -171,7 +174,10 @@ mod tests {
         ];
         let result = pretty_trigger(&paths, &root);
         // After dedup it's a single path — should NOT say "2 files".
-        assert!(!result.contains("files"), "duplicate paths should be deduped. got: {result}");
+        assert!(
+            !result.contains("files"),
+            "duplicate paths should be deduped. got: {result}"
+        );
         assert!(result.contains("findings/001.md"), "got: {result}");
     }
 

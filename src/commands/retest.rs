@@ -93,8 +93,8 @@ pub fn run(root: &Path) -> Result<()> {
     // Load the freshly written JSON as the "after" state.
     let new_data = std::fs::read_to_string(&snapshot_path)
         .with_context(|| format!("reading updated snapshot {}", snapshot_path.display()))?;
-    let new: Engagement = serde_json::from_str(&new_data)
-        .context("parsing freshly built engagement JSON")?;
+    let new: Engagement =
+        serde_json::from_str(&new_data).context("parsing freshly built engagement JSON")?;
 
     let diff = compute_diff(&engagement_name, &old, &new);
     print_diff(&diff);
@@ -139,8 +139,7 @@ fn compute_diff(engagement_name: &str, old: &Engagement, new: &Engagement) -> Re
                     "regressed" => regressed_count += 1,
                     _ => changed_count += 1,
                 }
-                let label =
-                    build_label(old_f.status, new_f.status, old_f.severity, new_f.severity);
+                let label = build_label(old_f.status, new_f.status, old_f.severity, new_f.severity);
                 deltas.push(FindingDelta {
                     id: id.to_string(),
                     title: new_f.title.clone(),
@@ -242,7 +241,11 @@ fn build_label(
         parts.push(format!("{} → {}", before_s.as_str(), after_s.as_str()));
     }
     if before_sev != after_sev {
-        parts.push(format!("sev: {} → {}", before_sev.as_str(), after_sev.as_str()));
+        parts.push(format!(
+            "sev: {} → {}",
+            before_sev.as_str(),
+            after_sev.as_str()
+        ));
     }
     parts.join(" / ")
 }
@@ -251,23 +254,30 @@ fn build_label(
 
 fn print_diff(diff: &RetestDiff) {
     println!();
-    println!("{}", style("── Retest Delta ─────────────────────────────────────────").dim());
+    println!(
+        "{}",
+        style("── Retest Delta ─────────────────────────────────────────").dim()
+    );
+    let new_s = format!("{} new", style(diff.new_count).cyan());
+    let resolved_s = format!("{} resolved", style(diff.resolved_count).green());
+    let regressed_s = if diff.regressed_count > 0 {
+        format!("{} regressed", style(diff.regressed_count).red().bold())
+    } else {
+        format!("{} regressed", style(diff.regressed_count).dim())
+    };
+    let changed_s = format!("{} changed", style(diff.changed_count).yellow());
+    let removed_s = format!("{} removed", style(diff.removed_count).dim());
+    let unchanged_s = format!("{} unchanged", style(diff.unchanged_count).dim());
     println!(
         "  {}  ·  {}  ·  {}  ·  {}  ·  {}  ·  {}",
-        format!("{} new", style(diff.new_count).cyan()),
-        format!("{} resolved", style(diff.resolved_count).green()),
-        if diff.regressed_count > 0 {
-            format!("{} regressed", style(diff.regressed_count).red().bold())
-        } else {
-            format!("{} regressed", style(diff.regressed_count).dim())
-        },
-        format!("{} changed", style(diff.changed_count).yellow()),
-        format!("{} removed", style(diff.removed_count).dim()),
-        format!("{} unchanged", style(diff.unchanged_count).dim()),
+        new_s, resolved_s, regressed_s, changed_s, removed_s, unchanged_s
     );
 
-    let notable: Vec<&FindingDelta> =
-        diff.deltas.iter().filter(|d| d.change_type != "unchanged").collect();
+    let notable: Vec<&FindingDelta> = diff
+        .deltas
+        .iter()
+        .filter(|d| d.change_type != "unchanged")
+        .collect();
 
     if notable.is_empty() {
         println!("  No changes since last build.");
@@ -277,13 +287,20 @@ fn print_diff(diff: &RetestDiff) {
     println!();
     for d in notable {
         let change = match d.change_type.as_str() {
-            "new" => style(format!("+ NEW")).cyan().to_string(),
+            "new" => style("+ NEW").cyan().to_string(),
             "removed" => style("− REMOVED").dim().to_string(),
             "resolved" => style(format!("✓ {}", d.label)).green().to_string(),
             "regressed" => style(format!("↓ {}", d.label)).red().bold().to_string(),
             _ => style(format!("~ {}", d.label)).yellow().to_string(),
         };
-        let sev_char = d.severity.as_str().chars().next().unwrap_or('?').to_uppercase().to_string();
+        let sev_char = d
+            .severity
+            .as_str()
+            .chars()
+            .next()
+            .unwrap_or('?')
+            .to_uppercase()
+            .to_string();
         println!(
             "  [{}] {}  {}  {}",
             style(sev_char).bold(),
@@ -431,8 +448,8 @@ mod tests {
 
     use super::*;
     use crate::model::{
-        Client, Engagement, EngagementMeta, Finding, LibraryConfig, OutputConfig,
-        Severity, SeverityThresholds, Status, TemplateConfig,
+        Client, Engagement, EngagementMeta, Finding, LibraryConfig, OutputConfig, Severity,
+        SeverityThresholds, Status, TemplateConfig,
     };
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -481,7 +498,12 @@ mod tests {
     #[test]
     fn classify_open_to_resolved_is_resolved() {
         assert_eq!(
-            classify_change(Status::Open, Status::Resolved, Severity::High, Severity::High),
+            classify_change(
+                Status::Open,
+                Status::Resolved,
+                Severity::High,
+                Severity::High
+            ),
             "resolved"
         );
     }
@@ -489,7 +511,12 @@ mod tests {
     #[test]
     fn classify_accepted_to_resolved_is_resolved() {
         assert_eq!(
-            classify_change(Status::Accepted, Status::Resolved, Severity::Medium, Severity::Medium),
+            classify_change(
+                Status::Accepted,
+                Status::Resolved,
+                Severity::Medium,
+                Severity::Medium
+            ),
             "resolved"
         );
     }
@@ -510,7 +537,12 @@ mod tests {
     #[test]
     fn classify_resolved_to_open_is_regressed() {
         assert_eq!(
-            classify_change(Status::Resolved, Status::Open, Severity::Critical, Severity::Critical),
+            classify_change(
+                Status::Resolved,
+                Status::Open,
+                Severity::Critical,
+                Severity::Critical
+            ),
             "regressed"
         );
     }
@@ -518,7 +550,12 @@ mod tests {
     #[test]
     fn classify_open_to_accepted_is_changed() {
         assert_eq!(
-            classify_change(Status::Open, Status::Accepted, Severity::High, Severity::High),
+            classify_change(
+                Status::Open,
+                Status::Accepted,
+                Severity::High,
+                Severity::High
+            ),
             "changed"
         );
     }
@@ -554,7 +591,12 @@ mod tests {
     fn classify_severity_only_change_is_changed() {
         // Status identical — only severity differs.
         assert_eq!(
-            classify_change(Status::Open, Status::Open, Severity::Critical, Severity::High),
+            classify_change(
+                Status::Open,
+                Status::Open,
+                Severity::Critical,
+                Severity::High
+            ),
             "changed"
         );
     }
@@ -563,7 +605,12 @@ mod tests {
     fn classify_status_to_resolved_plus_severity_change_is_resolved() {
         // When status moves to resolved, that label wins even if severity also changed.
         assert_eq!(
-            classify_change(Status::Open, Status::Resolved, Severity::Critical, Severity::High),
+            classify_change(
+                Status::Open,
+                Status::Resolved,
+                Severity::Critical,
+                Severity::High
+            ),
             "resolved"
         );
     }
@@ -586,33 +633,56 @@ mod tests {
 
     #[test]
     fn label_status_only_change() {
-        let lbl = build_label(Status::Open, Status::Resolved, Severity::High, Severity::High);
+        let lbl = build_label(
+            Status::Open,
+            Status::Resolved,
+            Severity::High,
+            Severity::High,
+        );
         assert_eq!(lbl, "open → resolved");
     }
 
     #[test]
     fn label_severity_only_change() {
-        let lbl =
-            build_label(Status::Open, Status::Open, Severity::Critical, Severity::High);
+        let lbl = build_label(
+            Status::Open,
+            Status::Open,
+            Severity::Critical,
+            Severity::High,
+        );
         assert_eq!(lbl, "sev: critical → high");
     }
 
     #[test]
     fn label_both_status_and_severity_changed() {
-        let lbl = build_label(Status::Open, Status::Resolved, Severity::Critical, Severity::High);
+        let lbl = build_label(
+            Status::Open,
+            Status::Resolved,
+            Severity::Critical,
+            Severity::High,
+        );
         assert_eq!(lbl, "open → resolved / sev: critical → high");
     }
 
     #[test]
     fn label_false_positive_transition() {
-        let lbl =
-            build_label(Status::Open, Status::FalsePositive, Severity::Low, Severity::Low);
+        let lbl = build_label(
+            Status::Open,
+            Status::FalsePositive,
+            Severity::Low,
+            Severity::Low,
+        );
         assert_eq!(lbl, "open → false_positive");
     }
 
     #[test]
     fn label_regression() {
-        let lbl = build_label(Status::Resolved, Status::Open, Severity::High, Severity::High);
+        let lbl = build_label(
+            Status::Resolved,
+            Status::Open,
+            Severity::High,
+            Severity::High,
+        );
         assert_eq!(lbl, "resolved → open");
     }
 
@@ -639,7 +709,11 @@ mod tests {
 
     #[test]
     fn diff_open_to_resolved_increments_resolved_count() {
-        let old = make_engagement(vec![make_finding("F-001", Severity::Critical, Status::Open)]);
+        let old = make_engagement(vec![make_finding(
+            "F-001",
+            Severity::Critical,
+            Status::Open,
+        )]);
         let mut new_f = old.findings.clone();
         new_f[0].status = Status::Resolved;
         let new = make_engagement(new_f);
@@ -653,14 +727,20 @@ mod tests {
         assert_eq!(d.change_type, "resolved");
         assert_eq!(d.before_status, Some(Status::Open));
         assert_eq!(d.after_status, Some(Status::Resolved));
-        assert_eq!(d.before_severity, None, "severity unchanged — should be None");
+        assert_eq!(
+            d.before_severity, None,
+            "severity unchanged — should be None"
+        );
         assert_eq!(d.label, "open → resolved");
     }
 
     #[test]
     fn diff_resolved_to_open_increments_regressed_count() {
-        let old =
-            make_engagement(vec![make_finding("F-001", Severity::High, Status::Resolved)]);
+        let old = make_engagement(vec![make_finding(
+            "F-001",
+            Severity::High,
+            Status::Resolved,
+        )]);
         let mut new_f = old.findings.clone();
         new_f[0].status = Status::Open;
         let new = make_engagement(new_f);
@@ -675,8 +755,11 @@ mod tests {
 
     #[test]
     fn diff_accepted_to_resolved_counts_as_resolved() {
-        let old =
-            make_engagement(vec![make_finding("F-001", Severity::Medium, Status::Accepted)]);
+        let old = make_engagement(vec![make_finding(
+            "F-001",
+            Severity::Medium,
+            Status::Accepted,
+        )]);
         let mut new_f = old.findings.clone();
         new_f[0].status = Status::Resolved;
         let new = make_engagement(new_f);
@@ -739,8 +822,11 @@ mod tests {
 
     #[test]
     fn diff_severity_change_only() {
-        let old =
-            make_engagement(vec![make_finding("F-001", Severity::Critical, Status::Open)]);
+        let old = make_engagement(vec![make_finding(
+            "F-001",
+            Severity::Critical,
+            Status::Open,
+        )]);
         let mut new_f = old.findings.clone();
         new_f[0].severity = Severity::High;
         let new = make_engagement(new_f);
@@ -760,8 +846,11 @@ mod tests {
 
     #[test]
     fn diff_status_and_severity_both_changed() {
-        let old =
-            make_engagement(vec![make_finding("F-001", Severity::Critical, Status::Open)]);
+        let old = make_engagement(vec![make_finding(
+            "F-001",
+            Severity::Critical,
+            Status::Open,
+        )]);
         let mut new_f = old.findings.clone();
         new_f[0].status = Status::Resolved;
         new_f[0].severity = Severity::High;
@@ -806,15 +895,27 @@ mod tests {
     #[test]
     fn diff_multiple_concurrent_changes_counted_correctly() {
         let old = make_engagement(vec![
-            make_finding("F-001", Severity::Critical, Status::Open),   // → severity downgraded
-            make_finding("F-002", Severity::High, Status::Resolved),   // → regressed
-            make_finding("F-003", Severity::Medium, Status::Open),     // → resolved
-            make_finding("F-004", Severity::Low, Status::Open),        // → unchanged
+            make_finding("F-001", Severity::Critical, Status::Open), // → severity downgraded
+            make_finding("F-002", Severity::High, Status::Resolved), // → regressed
+            make_finding("F-003", Severity::Medium, Status::Open),   // → resolved
+            make_finding("F-004", Severity::Low, Status::Open),      // → unchanged
         ]);
         let new = make_engagement(vec![
-            { let mut f = old.findings[0].clone(); f.severity = Severity::High; f },
-            { let mut f = old.findings[1].clone(); f.status = Status::Open; f },
-            { let mut f = old.findings[2].clone(); f.status = Status::Resolved; f },
+            {
+                let mut f = old.findings[0].clone();
+                f.severity = Severity::High;
+                f
+            },
+            {
+                let mut f = old.findings[1].clone();
+                f.status = Status::Open;
+                f
+            },
+            {
+                let mut f = old.findings[2].clone();
+                f.status = Status::Resolved;
+                f
+            },
             old.findings[3].clone(),
             make_finding("F-005", Severity::Info, Status::Open), // new
         ]);
@@ -872,7 +973,10 @@ mod tests {
         let new = make_engagement(vec![]);
         let diff = compute_diff("Test", &old, &new);
         assert!(!diff.generated_at.is_empty());
-        assert!(diff.generated_at.contains('T'), "should be an ISO 8601 timestamp");
+        assert!(
+            diff.generated_at.contains('T'),
+            "should be an ISO 8601 timestamp"
+        );
     }
 
     // ── render_html ───────────────────────────────────────────────────────────
@@ -905,7 +1009,10 @@ mod tests {
     fn html_contains_engagement_name() {
         let diff = make_diff_with_one_resolved();
         let html = render_html(&diff).unwrap();
-        assert!(html.contains("Acme Corp"), "engagement name missing from HTML");
+        assert!(
+            html.contains("Acme Corp"),
+            "engagement name missing from HTML"
+        );
     }
 
     #[test]
@@ -931,7 +1038,10 @@ mod tests {
     fn html_applies_change_type_css_class() {
         let diff = make_diff_with_one_resolved();
         let html = render_html(&diff).unwrap();
-        assert!(html.contains("tag-resolved"), "change-type badge class missing");
+        assert!(
+            html.contains("tag-resolved"),
+            "change-type badge class missing"
+        );
     }
 
     #[test]
