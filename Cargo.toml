@@ -2,16 +2,19 @@
 name = "reptr"
 version = "0.8.0"
 edition = "2021"
+rust-version = "1.74"
+authors = ["Viral Parmar"]
 description = "Local-first pentest report generator: Markdown findings -> HTML/JSON/DOCX/PDF."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourhandle/reptr"
-homepage = "https://github.com/yourhandle/reptr"
+repository = "https://github.com/vral-parmar/reptr"
+homepage = "https://vral-parmar.github.io/reptr/"
 documentation = "https://docs.rs/reptr"
 readme = "README.md"
 keywords = ["pentest", "security", "report", "markdown", "cli"]
 categories = ["command-line-utilities"]
 exclude = [
     "/.github/**",
+    "/docs/**",
     "/graphify-out/**",
     "/reptr-build-plan.md",
     "/findings/**",
