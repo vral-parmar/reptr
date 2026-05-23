@@ -1,0 +1,64 @@
+[package]
+name = "reptr"
+version = "0.8.0"
+edition = "2021"
+description = "Local-first pentest report generator: Markdown findings -> HTML/JSON/DOCX/PDF."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourhandle/reptr"
+homepage = "https://github.com/yourhandle/reptr"
+documentation = "https://docs.rs/reptr"
+readme = "README.md"
+keywords = ["pentest", "security", "report", "markdown", "cli"]
+categories = ["command-line-utilities"]
+exclude = [
+    "/.github/**",
+    "/graphify-out/**",
+    "/reptr-build-plan.md",
+    "/findings/**",
+    "/output/**",
+    "/tests/fixtures/sample-engagement/output/**",
+]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ target }.{ archive-format }"
+pkg-fmt = "tar.gz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[[bin]]
+name = "reptr"
+path = "src/main.rs"
+
+[lib]
+name = "reptr"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+gray_matter = "0.2"
+comrak = "0.26"
+minijinja = "2"
+walkdir = "2"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+console = "0.15"
+chrono = { version = "0.4", features = ["serde"] }
+docx-rs = "0.4"
+notify = "6"
+regex = "1"
+cvss = { version = "2", features = ["v3", "std"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

@@ -1,0 +1,10 @@
+[build]
+# Cross uses Docker images for these targets. The default images already
+# include a C toolchain and OpenSSL, which is all reptr needs.
+pre-build = []
+
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:edge"
+
+[target.aarch64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:edge"
