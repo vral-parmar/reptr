@@ -8,6 +8,7 @@
 [![Crates.io](https://img.shields.io/crates/v/reptr.svg)](https://crates.io/crates/reptr)
 [![docs.rs](https://img.shields.io/docsrs/reptr)](https://docs.rs/reptr)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![Crates.io Downloads](https://img.shields.io/crates/d/reptr.svg)](https://crates.io/crates/reptr)
 
 ---
 
